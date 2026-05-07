@@ -1,0 +1,35 @@
+exports.handler = async function(event, context) {
+  return {
+    statusCode: 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8"
+    },
+    body: `<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Папка договоров</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; padding: 30px; background: #f9f9f9; text-align: center; }
+        .btn { display: inline-block; padding: 14px 28px; margin: 20px 0; background-color: #2fc6f6; color: white !important; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.15); transition: background-color 0.2s; }
+        .btn:hover { background-color: #1b6d8c; }
+        .path { margin-top: 15px; font-size: 14px; color: #555; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <h2>📂 Договоры 2026</h2>
+    <a href="file://///PROMSRV/Docs/Promarmservice%20Ltd/%D0%94%D0%9E%D0%93%D0%9E%D0%92%D0%9E%D0%A0%D0%AB/2026/14.%20NTGD"
+       class="btn">
+        Открыть папку в проводнике
+    </a>
+    <div class="path">
+        Сетевой путь:<br>
+        \\\\PROMSRV\\Docs\\Promarmservice Ltd\\ДОГОВОРЫ\\2026\\14. NTGD
+    </div>
+    <p style="margin-top: 25px; color: #888; font-size: 13px;">
+        Если кнопка не сработала, скопируйте путь выше и вставьте в адресную строку Проводника.
+    </p>
+</body>
+</html>`
+  };
+};
