@@ -30,18 +30,16 @@ app.all('*', (req, res) => {
     (async function() {
       const appEl = document.getElementById('app');
       
-      // 1. Извлекаем taskId и access_token из URL
       const urlParams = new URLSearchParams(window.location.search);
       const taskId = urlParams.get('taskId');
       const accessToken = urlParams.get('access_token');
       
       if (!taskId || !accessToken) {
-        appEl.innerHTML = '<p class="error">Не удалось получить параметры задачи.</p>';
+        appEl.innerHTML = '<p class="error">Не удалось получить параметры задачи. Убедитесь, что приложение является встраиваемым и открыто внутри задачи.</p>';
         return;
       }
 
       try {
-        // 2. Вызываем tasks.task.get
         const response = await fetch(
           'https://your-domain.bitrix24.ru/rest/tasks.task.get.json?auth=' + accessToken,
           {
@@ -52,18 +50,15 @@ app.all('*', (req, res) => {
         );
         const data = await response.json();
         
-        // 3. Проверяем наличие описания
         if (!data.result || !data.result.description) {
           appEl.innerHTML = '<p class="error">В задаче нет описания.</p>';
           return;
         }
 
         const descriptionHtml = data.result.description;
-        
-        // 4. Очищаем HTML-теги, чтобы получить чистый текст
+        // Очищаем HTML-теги
         const cleanText = descriptionHtml.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();
         
-        // 5. Ищем ключевую фразу "Документы по адресу"
         const marker = 'Документы по адресу ';
         const markerIndex = cleanText.indexOf(marker);
         if (markerIndex === -1) {
@@ -71,12 +66,7 @@ app.all('*', (req, res) => {
           return;
         }
 
-        // 6. Извлекаем путь после фразы (до конца текста)
         let rawPath = cleanText.substring(markerIndex + marker.length).trim();
-        
-        // 7. Если путь содержит что-то лишнее (например, продолжение текста), 
-        //    можно обрезать по первой кавычке или переносу, но по условию адрес всегда в конце.
-        //    Удалим возможные оставшиеся теги/пробелы.
         rawPath = rawPath.replace(/<[^>]*>/g, '').trim();
         
         if (!rawPath) {
@@ -84,27 +74,17 @@ app.all('*', (req, res) => {
           return;
         }
 
-        // 8. Кодируем путь для networkfolder-ссылки
-        //    Заменяем обратные слеши на прямые, кодируем пробелы и спецсимволы
+        // Кодируем путь
         const encodedPath = rawPath
-          .replace(/\\\\/g, '/')  // \\ -> /
-          .split('/').map(part => encodeURIComponent(part)).join('/');
+          .replace(/\\\\/g, '/')
+          .split('/').map(function(part) { return encodeURIComponent(part); }).join('/');
           
         const networkLink = 'networkfolder://' + encodedPath;
         
-        // 9. Отображаем кнопку
-        appEl.innerHTML = `
-          <a href="\${networkLink}" class="btn">
-            📂 Открыть папку в проводнике
-          </a>
-          <div class="path">
-            Сетевой путь:<br>
-            \${rawPath}
-          </div>
-          <p style="margin-top: 25px; color: #888; font-size: 13px;">
-            Если кнопка не сработала, скопируйте путь выше и вставьте в адресную строку Проводника.
-          </p>
-        `;
+        // Формируем кнопку
+        appEl.innerHTML = '<a href="' + networkLink + '" class="btn">📂 Открыть папку в проводнике</a>' +
+          '<div class="path">Сетевой путь:<br>' + rawPath + '</div>' +
+          '<p style="margin-top: 25px; color: #888; font-size: 13px;">Если кнопка не сработала, скопируйте путь выше и вставьте в адресную строку Проводника.</p>';
       } catch (err) {
         console.error(err);
         appEl.innerHTML = '<p class="error">Ошибка при получении данных задачи.</p>';
@@ -116,4 +96,4 @@ app.all('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log('Server running on port ' + PORT));
