@@ -37,80 +37,89 @@ app.all('*', (req, res) => {
 <body>
   <h2>📂 Документы по задаче</h2>
   <div id="app"><p>Загрузка данных задачи…</p></div>
+
+  <script type="application/json" id="app-data">
+    {
+      "taskId": "${taskId || ''}",
+      "accessToken": "${accessToken || ''}"
+    }
+  </script>
+
   <script>
-    var __taskId = '${taskId || ""}';
-    var __accessToken = '${accessToken || ""}';
-
     (async function() {
-      var appEl = document.getElementById("app");
-      if (!__taskId || !__accessToken) {
-        appEl.innerHTML = '<p class="error">Не удалось получить параметры задачи.</p>';
-        return;
-      }
+      const appEl = document.getElementById('app');
       try {
-        var url = "https://vach.bitrix24.by/rest/32/uy3csu7xk0jek8u1/task.item.getdescription.json?ID=" + __taskId;
-        var resp = await fetch(url);
-        var data = await resp.json();
+        const data = JSON.parse(document.getElementById('app-data').textContent);
+        const taskId = data.taskId;
+        const accessToken = data.accessToken;
 
-        var desc = '';
-        if (data.result) {
-          if (typeof data.result === 'string') {
-            desc = data.result;
-          } else if (data.result.DESCRIPTION) {
-            desc = data.result.DESCRIPTION;
-          } else if (data.result.description) {
-            desc = data.result.description;
-          }
+        if (!taskId || !accessToken) {
+          appEl.innerHTML = '<p class="error">Не удалось получить параметры задачи. Проверьте встройку.</p>';
+          return;
+        }
+
+        const url = 'https://vach.bitrix24.by/rest/32/uy3csu7xk0jek8u1/task.item.getdescription.json?ID=' + taskId;
+        const resp = await fetch(url);
+        const json = await resp.json();
+
+        let desc = '';
+        if (typeof json.result === 'string') {
+          desc = json.result;
+        } else if (json.result && json.result.DESCRIPTION) {
+          desc = json.result.DESCRIPTION;
+        } else if (json.result && json.result.description) {
+          desc = json.result.description;
         }
 
         if (!desc) {
-          var debugInfo = '';
-          if (data.result) {
-            debugInfo = '<br>Тип результата: ' + typeof data.result;
-            if (typeof data.result === 'object') {
-              debugInfo += '<br>Поля: ' + Object.keys(data.result).join(', ');
-            }
-          } else if (data.error) {
-            debugInfo = '<br>Ошибка API: ' + JSON.stringify(data.error);
+          let debugInfo = '';
+          if (json.error) {
+            debugInfo = ' Ошибка API: ' + JSON.stringify(json.error);
+          } else if (json.result) {
+            debugInfo = ' Поля результата: ' + Object.keys(json.result).join(', ');
           }
           appEl.innerHTML = '<p class="error">Не удалось получить описание.' + debugInfo + '</p>';
           return;
         }
 
         // Очищаем HTML-теги
-        desc = desc.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+        desc = desc.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
-        var marker = "Документы по адресу ";
-        var idx = desc.indexOf(marker);
+        const marker = 'Документы по адресу ';
+        const idx = desc.indexOf(marker);
         if (idx === -1) {
           appEl.innerHTML = '<p class="error">В описании не найдена фраза «Документы по адресу».</p>';
           return;
         }
 
-        var rawPath = desc.substring(idx + marker.length).trim();
-        rawPath = rawPath.replace(/<[^>]*>/g, "").trim();
+        let rawPath = desc.substring(idx + marker.length).trim();
+        rawPath = rawPath.replace(/<[^>]*>/g, '').trim();
+
         if (!rawPath) {
           appEl.innerHTML = '<p class="error">Не удалось извлечь путь к папке.</p>';
           return;
         }
 
-        // Преобразование UNC-пути в формат для networkfolder://
-        // Меняем обратные слеши на прямые, убираем лишние ведущие слеши, кодируем компоненты
-        var cleanPath = rawPath.replace(/\\/g, '/').replace(/^\/+/, '');
-        var encodedPath = cleanPath.split('/').map(function(p) { return encodeURIComponent(p); }).join('/');
-        var link = "networkfolder://" + encodedPath;
+        // Преобразуем UNC-путь в формат networkfolder://...
+        const cleanPath = rawPath.replace(/\\/g, '/').replace(/^\/+/, '');
+        const encodedPath = cleanPath.split('/').map(encodeURIComponent).join('/');
+        const link = 'networkfolder://' + encodedPath;
 
-        // Отладочная информация (можно удалить, когда всё заработает)
-        var debugHtml = '<div class="debug">Отладка:<br>rawPath: ' + rawPath + '<br>cleanPath: ' + cleanPath + '<br>URL: ' + link + '</div>';
+        // Формируем отладочную информацию
+        const debugHtml = '<div class="debug">' +
+          'rawPath: ' + rawPath + '<br>' +
+          'cleanPath: ' + cleanPath + '<br>' +
+          'URL: ' + link +
+          '</div>';
 
-        appEl.innerHTML = '<a href="' + link + '" class="btn">📂 Открыть папку в проводнике</a>' +
+        appEl.innerHTML =
+          '<a href="' + link + '" class="btn">📂 Открыть папку в проводнике</a>' +
           '<div class="path">Сетевой путь:<br>' + rawPath + '</div>' +
           debugHtml +
           '<p style="margin-top: 25px; color: #888; font-size: 13px;">Если кнопка не сработала, скопируйте путь выше и вставьте в адресную строку Проводника.</p>';
+
       } catch (e) {
-        var errMsg = 'Ошибка: ' + (e.message || e);
-        console.error(e);
-        appEl.innerHTML = '<p class="error">' + errMsg + '</p>';
+        appEl.innerHTML = '<p class="error">Критическая ошибка: ' + e.message + '</p>';
       }
     })();
   </script>
