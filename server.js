@@ -17,7 +17,7 @@ app.all('*', (req, res) => {
     } catch (e) {}
   }
 
-  if (!taskId) taskId = req.query.taskId;
+  if (!taskId) taskId = req.query.ID;
   if (!accessToken) accessToken = req.query.access_token;
 
   res.send(`<!DOCTYPE html>
@@ -47,14 +47,10 @@ app.all('*', (req, res) => {
         return;
       }
       try {
-        // Используем task.item.getdescription (GET-запрос)
-        var url = "https://vach.bitrix24.by/rest/task.item.getdescription.json"
-                + "?auth=" + __accessToken
-                + "&taskId=" + __taskId;
+        var url = "https://vach.bitrix24.by/rest/32/uy3csu7xk0jek8u1/task.item.getdescription.json?ID=" + __taskId;
         var resp = await fetch(url);
         var data = await resp.json();
 
-        // Извлекаем описание – обычно оно в data.result.DESCRIPTION или data.result
         var desc = '';
         if (data.result) {
           if (typeof data.result === 'string') {
@@ -80,7 +76,6 @@ app.all('*', (req, res) => {
           return;
         }
 
-        // Очищаем HTML-теги
         desc = desc.replace(/<[^>]*>/g, " ").replace(/\\s+/g, " ").trim();
 
         var marker = "Документы по адресу ";
@@ -97,7 +92,6 @@ app.all('*', (req, res) => {
           return;
         }
 
-        // Кодируем для networkfolder://
         var encodedPath = rawPath
           .replace(/\\\\/g, "/")
           .split("/")
