@@ -10,7 +10,6 @@ app.all('*', (req, res) => {
   let taskId = null;
   let accessToken = authId;
 
-  // Парсим PLACEMENT_OPTIONS, если есть
   if (placementOptionsRaw) {
     try {
       const opts = JSON.parse(placementOptionsRaw);
@@ -18,7 +17,6 @@ app.all('*', (req, res) => {
     } catch (e) {}
   }
 
-  // Если не нашли в POST, пробуем GET (на случай прямого открытия)
   if (!taskId) taskId = req.query.taskId;
   if (!accessToken) accessToken = req.query.access_token;
 
@@ -49,35 +47,69 @@ app.all('*', (req, res) => {
         return;
       }
       try {
-        var resp = await fetch("https://vach.bitrix24.by/rest/tasks.task.get.json?auth=" + __accessToken, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: "taskId=" + __taskId
-        });
+        // Используем task.item.getdescription (GET-запрос)
+        var url = "https://vach.bitrix24.by/rest/task.item.getdescription.json"
+                + "?auth=" + __accessToken
+                + "&taskId=" + __taskId;
+        var resp = await fetch(url);
         var data = await resp.json();
-        if (!data.result || !data.result.description) {
-          appEl.innerHTML = '<p class="error">В задаче нет описания.</p>';
+
+        // Извлекаем описание – обычно оно в data.result.DESCRIPTION или data.result
+        var desc = '';
+        if (data.result) {
+          if (typeof data.result === 'string') {
+            desc = data.result;
+          } else if (data.result.DESCRIPTION) {
+            desc = data.result.DESCRIPTION;
+          } else if (data.result.description) {
+            desc = data.result.description;
+          }
+        }
+
+        if (!desc) {
+          var debugInfo = '';
+          if (data.result) {
+            debugInfo = '<br>Тип результата: ' + typeof data.result;
+            if (typeof data.result === 'object') {
+              debugInfo += '<br>Поля: ' + Object.keys(data.result).join(', ');
+            }
+          } else if (data.error) {
+            debugInfo = '<br>Ошибка API: ' + JSON.stringify(data.error);
+          }
+          appEl.innerHTML = '<p class="error">Не удалось получить описание.' + debugInfo + '</p>';
           return;
         }
-        var desc = data.result.description.replace(/<[^>]*>/g, " ").replace(/\\s+/g, " ").trim();
+
+        // Очищаем HTML-теги
+        desc = desc.replace(/<[^>]*>/g, " ").replace(/\\s+/g, " ").trim();
+
         var marker = "Документы по адресу ";
         var idx = desc.indexOf(marker);
         if (idx === -1) {
           appEl.innerHTML = '<p class="error">В описании не найдена фраза «Документы по адресу».</p>';
           return;
         }
+
         var rawPath = desc.substring(idx + marker.length).trim();
         rawPath = rawPath.replace(/<[^>]*>/g, "").trim();
         if (!rawPath) {
           appEl.innerHTML = '<p class="error">Не удалось извлечь путь к папке.</p>';
           return;
         }
-        var encodedPath = rawPath.replace(/\\\\/g, "/").split("/").map(function(p) { return encodeURIComponent(p); }).join("/");
+
+        // Кодируем для networkfolder://
+        var encodedPath = rawPath
+          .replace(/\\\\/g, "/")
+          .split("/")
+          .map(function(p) { return encodeURIComponent(p); })
+          .join("/");
         var link = "networkfolder://" + encodedPath;
+
         appEl.innerHTML = '<a href="' + link + '" class="btn">📂 Открыть папку в проводнике</a><div class="path">Сетевой путь:<br>' + rawPath + '</div><p style="margin-top: 25px; color: #888; font-size: 13px;">Если кнопка не сработала, скопируйте путь выше и вставьте в адресную строку Проводника.</p>';
       } catch (e) {
+        var errMsg = 'Ошибка: ' + (e.message || e);
         console.error(e);
-        appEl.innerHTML = '<p class="error">Ошибка при получении данных задачи.</p>';
+        appEl.innerHTML = '<p class="error">' + errMsg + '</p>';
       }
     })();
   </script>
