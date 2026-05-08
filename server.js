@@ -49,7 +49,7 @@ app.all('*', (req, res) => {
         return;
       }
       try {
-        var resp = await fetch("https://your-domain.bitrix24.ru/rest/tasks.task.get.json?auth=" + __accessToken, {
+        var resp = await fetch("https://vach.bitrix24.by/rest/tasks.task.get.json?auth=" + __accessToken, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: "taskId=" + __taskId
