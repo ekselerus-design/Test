@@ -41,7 +41,7 @@ app.all('*', (req, res) => {
 
       try {
         const response = await fetch(
-          'https://your-domain.bitrix24.ru/rest/tasks.task.get.json?auth=' + accessToken,
+          'https://vach.bitrix24.by/rest/tasks.task.get.json?auth=' + accessToken,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
