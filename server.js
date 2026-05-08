@@ -6,7 +6,7 @@ app.all('*', (req, res) => {
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Папка договоров</title>
+  <title>Открыть папку</title>
   <style>
     body { font-family: 'Segoe UI', sans-serif; padding: 30px; background: #f9f9f9; text-align: center; }
     .btn {
@@ -14,24 +14,103 @@ app.all('*', (req, res) => {
       background-color: #2fc6f6; color: white !important; text-decoration: none;
       border-radius: 8px; font-size: 16px; font-weight: bold;
       box-shadow: 0 2px 6px rgba(0,0,0,0.15); transition: background-color 0.2s;
+      cursor: pointer;
     }
     .btn:hover { background-color: #1b6d8c; }
     .path { margin-top: 15px; font-size: 14px; color: #555; word-break: break-all; }
+    .error { color: #c33; margin-top: 20px; }
   </style>
 </head>
 <body>
-  <h2>📂 Договоры 2026</h2>
-  <a href="networkfolder://PROMSRV/Docs/Promarmservice%20Ltd/%D0%94%D0%9E%D0%93%D0%9E%D0%92%D0%9E%D0%A0%D0%AB/2026/14.%20NTGD"
-     class="btn">
-      Открыть папку в проводнике
-  </a>
-  <div class="path">
-    Сетевой путь:<br>
-    \\PROMSRV\\Docs\\Promarmservice Ltd\\ДОГОВОРЫ\\2026\\14. NTGD
+  <h2>📂 Документы по задаче</h2>
+  <div id="app">
+    <p>Загрузка данных задачи…</p>
   </div>
-  <p style="margin-top: 25px; color: #888; font-size: 13px;">
-    Если кнопка не сработала, скопируйте путь выше и вставьте в адресную строку Проводника.
-  </p>
+  <script>
+    (async function() {
+      const appEl = document.getElementById('app');
+      
+      // 1. Извлекаем taskId и access_token из URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const taskId = urlParams.get('taskId');
+      const accessToken = urlParams.get('access_token');
+      
+      if (!taskId || !accessToken) {
+        appEl.innerHTML = '<p class="error">Не удалось получить параметры задачи.</p>';
+        return;
+      }
+
+      try {
+        // 2. Вызываем tasks.task.get
+        const response = await fetch(
+          'https://your-domain.bitrix24.ru/rest/tasks.task.get.json?auth=' + accessToken,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'taskId=' + taskId
+          }
+        );
+        const data = await response.json();
+        
+        // 3. Проверяем наличие описания
+        if (!data.result || !data.result.description) {
+          appEl.innerHTML = '<p class="error">В задаче нет описания.</p>';
+          return;
+        }
+
+        const descriptionHtml = data.result.description;
+        
+        // 4. Очищаем HTML-теги, чтобы получить чистый текст
+        const cleanText = descriptionHtml.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();
+        
+        // 5. Ищем ключевую фразу "Документы по адресу"
+        const marker = 'Документы по адресу ';
+        const markerIndex = cleanText.indexOf(marker);
+        if (markerIndex === -1) {
+          appEl.innerHTML = '<p class="error">В описании не найдена фраза «Документы по адресу».</p>';
+          return;
+        }
+
+        // 6. Извлекаем путь после фразы (до конца текста)
+        let rawPath = cleanText.substring(markerIndex + marker.length).trim();
+        
+        // 7. Если путь содержит что-то лишнее (например, продолжение текста), 
+        //    можно обрезать по первой кавычке или переносу, но по условию адрес всегда в конце.
+        //    Удалим возможные оставшиеся теги/пробелы.
+        rawPath = rawPath.replace(/<[^>]*>/g, '').trim();
+        
+        if (!rawPath) {
+          appEl.innerHTML = '<p class="error">Не удалось извлечь путь к папке.</p>';
+          return;
+        }
+
+        // 8. Кодируем путь для networkfolder-ссылки
+        //    Заменяем обратные слеши на прямые, кодируем пробелы и спецсимволы
+        const encodedPath = rawPath
+          .replace(/\\\\/g, '/')  // \\ -> /
+          .split('/').map(part => encodeURIComponent(part)).join('/');
+          
+        const networkLink = 'networkfolder://' + encodedPath;
+        
+        // 9. Отображаем кнопку
+        appEl.innerHTML = `
+          <a href="\${networkLink}" class="btn">
+            📂 Открыть папку в проводнике
+          </a>
+          <div class="path">
+            Сетевой путь:<br>
+            \${rawPath}
+          </div>
+          <p style="margin-top: 25px; color: #888; font-size: 13px;">
+            Если кнопка не сработала, скопируйте путь выше и вставьте в адресную строку Проводника.
+          </p>
+        `;
+      } catch (err) {
+        console.error(err);
+        appEl.innerHTML = '<p class="error">Ошибка при получении данных задачи.</p>';
+      }
+    })();
+  </script>
 </body>
 </html>`);
 });
