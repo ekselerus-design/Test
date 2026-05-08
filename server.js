@@ -20,6 +20,10 @@ app.all('*', (req, res) => {
   if (!taskId) taskId = req.query.ID;
   if (!accessToken) accessToken = req.query.access_token;
 
+  // Безопасно экранируем значения для вставки в JS-строку
+  const safeTaskId = (taskId || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const safeToken = (accessToken || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
   res.send(`<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -38,31 +42,29 @@ app.all('*', (req, res) => {
   <h2>📂 Документы по задаче</h2>
   <div id="app"><p>Загрузка данных задачи…</p></div>
 
-  <script type="application/json" id="app-data">
-    {
-      "taskId": "${taskId || ''}",
-      "accessToken": "${accessToken || ''}"
-    }
-  </script>
-
   <script>
-    (async function() {
-      const appEl = document.getElementById('app');
-      try {
-        const data = JSON.parse(document.getElementById('app-data').textContent);
-        const taskId = data.taskId;
-        const accessToken = data.accessToken;
+    // Параметры переданы сервером безопасно
+    var __taskId = '${safeTaskId}';
+    var __accessToken = '${safeToken}';
 
-        if (!taskId || !accessToken) {
-          appEl.innerHTML = '<p class="error">Не удалось получить параметры задачи. Проверьте встройку.</p>';
-          return;
+    console.log('🟢 Приложение загружено');
+    console.log('taskId:', __taskId);
+    console.log('accessToken:', __accessToken.substring(0, 8) + '...');
+
+    (async function() {
+      var appEl = document.getElementById('app');
+      try {
+        if (!__taskId || !__accessToken) {
+          throw new Error('Параметры задачи пусты. taskId=' + __taskId + ', token=' + (__accessToken ? 'есть' : 'нет'));
         }
 
-        const url = 'https://vach.bitrix24.by/rest/32/uy3csu7xk0jek8u1/task.item.getdescription.json?ID=' + taskId;
-        const resp = await fetch(url);
-        const json = await resp.json();
+        console.log('➡️ Выполняем запрос к REST API...');
+        var url = 'https://vach.bitrix24.by/rest/32/uy3csu7xk0jek8u1/task.item.getdescription.json?ID=' + __taskId;
+        var resp = await fetch(url);
+        var json = await resp.json();
+        console.log('📦 Ответ API:', json);
 
-        let desc = '';
+        var desc = '';
         if (typeof json.result === 'string') {
           desc = json.result;
         } else if (json.result && json.result.DESCRIPTION) {
@@ -72,54 +74,47 @@ app.all('*', (req, res) => {
         }
 
         if (!desc) {
-          let debugInfo = '';
+          var debugInfo = '';
           if (json.error) {
             debugInfo = ' Ошибка API: ' + JSON.stringify(json.error);
           } else if (json.result) {
             debugInfo = ' Поля результата: ' + Object.keys(json.result).join(', ');
           }
-          appEl.innerHTML = '<p class="error">Не удалось получить описание.' + debugInfo + '</p>';
-          return;
+          throw new Error('Не удалось получить описание.' + debugInfo);
         }
 
+        console.log('📝 Описание получено, длина:', desc.length);
         // Очищаем HTML-теги
         desc = desc.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
-        const marker = 'Документы по адресу ';
-        const idx = desc.indexOf(marker);
+        var marker = 'Документы по адресу ';
+        var idx = desc.indexOf(marker);
         if (idx === -1) {
-          appEl.innerHTML = '<p class="error">В описании не найдена фраза «Документы по адресу».</p>';
-          return;
+          throw new Error('В описании не найдена фраза «Документы по адресу».');
         }
 
-        let rawPath = desc.substring(idx + marker.length).trim();
+        var rawPath = desc.substring(idx + marker.length).trim();
         rawPath = rawPath.replace(/<[^>]*>/g, '').trim();
-
         if (!rawPath) {
-          appEl.innerHTML = '<p class="error">Не удалось извлечь путь к папке.</p>';
-          return;
+          throw new Error('Не удалось извлечь путь к папке.');
         }
 
+        console.log('📁 Исходный путь:', rawPath);
         // Преобразуем UNC-путь в формат networkfolder://...
-        const cleanPath = rawPath.replace(/\\/g, '/').replace(/^\/+/, '');
-        const encodedPath = cleanPath.split('/').map(encodeURIComponent).join('/');
-        const link = 'networkfolder://' + encodedPath;
-
-        // Формируем отладочную информацию
-        const debugHtml = '<div class="debug">' +
-          'rawPath: ' + rawPath + '<br>' +
-          'cleanPath: ' + cleanPath + '<br>' +
-          'URL: ' + link +
-          '</div>';
+        var cleanPath = rawPath.replace(/\\/g, '/').replace(/^\/+/, '');
+        var encodedPath = cleanPath.split('/').map(encodeURIComponent).join('/');
+        var link = 'networkfolder://' + encodedPath;
+        console.log('🔗 Итоговая ссылка:', link);
 
         appEl.innerHTML =
           '<a href="' + link + '" class="btn">📂 Открыть папку в проводнике</a>' +
           '<div class="path">Сетевой путь:<br>' + rawPath + '</div>' +
-          debugHtml +
+          '<div class="debug">Отладка:<br>rawPath: ' + rawPath + '<br>cleanPath: ' + cleanPath + '<br>URL: ' + link + '</div>' +
           '<p style="margin-top: 25px; color: #888; font-size: 13px;">Если кнопка не сработала, скопируйте путь выше и вставьте в адресную строку Проводника.</p>';
 
       } catch (e) {
-        appEl.innerHTML = '<p class="error">Критическая ошибка: ' + e.message + '</p>';
+        console.error('❌ Ошибка:', e.message);
+        appEl.innerHTML = '<p class="error">' + e.message + '</p>';
       }
     })();
   </script>
