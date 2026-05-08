@@ -1,0 +1,12 @@
+{
+  "name": "folder-opener",
+  "version": "1.0.0",
+  "description": "Кнопка открытия сетевой папки",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
