@@ -31,6 +31,7 @@ app.all('*', (req, res) => {
     .btn:hover { background-color: #1b6d8c; }
     .path { margin-top: 15px; font-size: 14px; color: #555; word-break: break-all; }
     .error { color: #c33; margin-top: 20px; }
+    .debug { font-size: 12px; color: #888; margin-top: 10px; background: #f0f0f0; padding: 8px; border-radius: 4px; }
   </style>
 </head>
 <body>
@@ -51,7 +52,7 @@ app.all('*', (req, res) => {
         var resp = await fetch(url);
         var data = await resp.json();
 
-              var desc = '';
+        var desc = '';
         if (data.result) {
           if (typeof data.result === 'string') {
             desc = data.result;
@@ -77,7 +78,7 @@ app.all('*', (req, res) => {
         }
 
         // Очищаем HTML-теги
-        desc = desc.replace(/<[^>]*>/g, " ").replace(/\\s+/g, " ").trim();
+        desc = desc.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
         var marker = "Документы по адресу ";
         var idx = desc.indexOf(marker);
@@ -93,22 +94,25 @@ app.all('*', (req, res) => {
           return;
         }
 
-        // ---- Исправленное преобразование пути ----
-        // 1. Меняем все обратные слеши на прямые
-        var cleanPath = rawPath.replace(/\\/g, '/');
-        // 2. Убираем возможные ведущие прямые слеши (чтобы не получилось networkfolder:////PROMSRV...)
-        cleanPath = cleanPath.replace(/^\/+/, '');
-        // 3. Кодируем каждую часть пути
+        // Преобразование UNC-пути в формат для networkfolder://
+        // Меняем обратные слеши на прямые, убираем лишние ведущие слеши, кодируем компоненты
+        var cleanPath = rawPath.replace(/\\/g, '/').replace(/^\/+/, '');
         var encodedPath = cleanPath.split('/').map(function(p) { return encodeURIComponent(p); }).join('/');
         var link = "networkfolder://" + encodedPath;
 
-        // Временная диагностика — покажем, что получилось (потом можно убрать)
-        var debugText = '<p style="font-size:12px; color:#888;">Отладка:<br>rawPath: ' + rawPath + '<br>cleanPath: ' + cleanPath + '<br>URL: ' + link + '</p>';
+        // Отладочная информация (можно удалить, когда всё заработает)
+        var debugHtml = '<div class="debug">Отладка:<br>rawPath: ' + rawPath + '<br>cleanPath: ' + cleanPath + '<br>URL: ' + link + '</div>';
 
         appEl.innerHTML = '<a href="' + link + '" class="btn">📂 Открыть папку в проводнике</a>' +
           '<div class="path">Сетевой путь:<br>' + rawPath + '</div>' +
-          debugText +
+          debugHtml +
           '<p style="margin-top: 25px; color: #888; font-size: 13px;">Если кнопка не сработала, скопируйте путь выше и вставьте в адресную строку Проводника.</p>';
+      } catch (e) {
+        var errMsg = 'Ошибка: ' + (e.message || e);
+        console.error(e);
+        appEl.innerHTML = '<p class="error">' + errMsg + '</p>';
+      }
+    })();
   </script>
 </body>
 </html>`);
