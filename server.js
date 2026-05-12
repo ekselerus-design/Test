@@ -4,7 +4,6 @@ const app = express();
 
 app.use(express.urlencoded({ extended: true }));
 
-// Простая функция для HTTP GET-запроса
 function fetchUrl(url) {
   return new Promise((resolve, reject) => {
     https.get(url, (res) => {
@@ -33,13 +32,10 @@ app.all('*', async (req, res) => {
       return res.send(errorPage('Не передан ID задачи.'));
     }
 
-    // URL вашего вебхука для получения описания
     const apiUrl = `https://vach.bitrix24.by/rest/32/uy3csu7xk0jek8u1/task.item.getdescription.json?ID=${taskId}`;
-
     const jsonStr = await fetchUrl(apiUrl);
     const apiResponse = JSON.parse(jsonStr);
 
-    // Извлекаем описание
     let desc = '';
     if (typeof apiResponse.result === 'string') {
       desc = apiResponse.result;
@@ -72,9 +68,8 @@ app.all('*', async (req, res) => {
       return res.send(errorPage('Не удалось извлечь путь к папке.'));
     }
 
-    // Преобразуем UNC-путь: \\ -> / и убираем ведущие слеши
+    // Преобразуем UNC-путь в формат networkfolder://
     const cleanPath = rawPath.replace(/\\/g, '/').replace(/^\/+/, '');
-    // ВАЖНО: НЕ кодируем пробелы и кириллицу, чтобы проводник открыл папку корректно
     const link = `networkfolder://${cleanPath}`;
 
     res.send(successPage(rawPath, link));
@@ -92,16 +87,32 @@ function successPage(rawPath, link) {
   <title>Открыть папку</title>
   <style>
     body { font-family: "Segoe UI", sans-serif; padding: 30px; background: #f9f9f9; text-align: center; }
-    .btn { display: inline-block; padding: 14px 28px; margin: 20px 0; background-color: #2fc6f6; color: white !important; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.15); transition: background-color 0.2s; cursor: pointer; }
+    .btn { display: inline-block; padding: 14px 28px; margin: 20px 0; background-color: #2fc6f6; color: white !important; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.15); transition: background-color 0.2s; cursor: pointer; border: none; }
     .btn:hover { background-color: #1b6d8c; }
     .path { margin-top: 15px; font-size: 14px; color: #555; word-break: break-all; }
+    .copied { color: #2fc6f6; display: none; margin-left: 10px; }
   </style>
 </head>
 <body>
   <h2>📂 Документы по задаче</h2>
-  <a href="${link}" class="btn">📂 Открыть папку в проводнике</a>
-  <div class="path">Сетевой путь:<br>${rawPath}</div>
-  <p style="margin-top: 25px; color: #888; font-size: 13px;">Если кнопка не сработала, скопируйте путь выше и вставьте в адресную строку Проводника.</p>
+  <p>Сетевой путь:<br><strong>${rawPath}</strong></p>
+  <button class="btn" id="openBtn">📂 Открыть папку в проводнике</button>
+  <span id="copiedMsg" class="copied">✔ Скопировано</span>
+  <p style="margin-top: 25px; color: #888; font-size: 13px;">
+    Если кнопка не сработала, скопируйте путь и вставьте в адресную строку Проводника (Win+E).
+  </p>
+  <script>
+    document.getElementById('openBtn').addEventListener('click', function() {
+      var newWindow = window.open('${link}', '_blank');
+      if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
+        navigator.clipboard.writeText('${rawPath.replace(/\\/g, '\\\\')}').then(function() {
+          var msg = document.getElementById('copiedMsg');
+          msg.style.display = 'inline';
+          setTimeout(function() { msg.style.display = 'none'; }, 2000);
+        });
+      }
+    });
+  </script>
 </body>
 </html>`;
 }
