@@ -52,7 +52,6 @@ app.all('*', async (req, res) => {
       return res.send(errorPage(`Не удалось получить описание. ${errDetail}`));
     }
 
-    // Очищаем HTML-теги
     desc = desc.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
     const marker = 'Документы по адресу ';
@@ -68,7 +67,6 @@ app.all('*', async (req, res) => {
       return res.send(errorPage('Не удалось извлечь путь к папке.'));
     }
 
-    // Преобразуем UNC-путь в формат networkfolder://
     const cleanPath = rawPath.replace(/\\/g, '/').replace(/^\/+/, '');
     const link = `networkfolder://${cleanPath}`;
 
@@ -103,14 +101,7 @@ function successPage(rawPath, link) {
   </p>
   <script>
     document.getElementById('openBtn').addEventListener('click', function() {
-      var newWindow = window.open('${link}', '_blank');
-      if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
-        navigator.clipboard.writeText('${rawPath.replace(/\\/g, '\\\\')}').then(function() {
-          var msg = document.getElementById('copiedMsg');
-          msg.style.display = 'inline';
-          setTimeout(function() { msg.style.display = 'none'; }, 2000);
-        });
-      }
+      window.location.href = '${link}';
     });
   </script>
 </body>
