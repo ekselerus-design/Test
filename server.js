@@ -67,6 +67,7 @@ app.all('*', async (req, res) => {
       return res.send(errorPage('Не удалось извлечь путь к папке.'));
     }
 
+    // Преобразуем в формат networkfolder:// (меняем \\ на /, убираем ведущие слеши)
     const cleanPath = rawPath.replace(/\\/g, '/').replace(/^\/+/, '');
     const link = `networkfolder://${cleanPath}`;
 
@@ -97,11 +98,32 @@ function successPage(rawPath, link) {
   <button class="btn" id="openBtn">📂 Открыть папку в проводнике</button>
   <span id="copiedMsg" class="copied">✔ Скопировано</span>
   <p style="margin-top: 25px; color: #888; font-size: 13px;">
-    Если кнопка не сработала, скопируйте путь и вставьте в адресную строку Проводника (Win+E).
+    Если кнопка не сработала, путь уже скопирован – вставьте его в адресную строку Проводника (Win+E).
   </p>
   <script>
     document.getElementById('openBtn').addEventListener('click', function() {
-      window.location.href = '${link}';
+      var link = '${link}';
+      try {
+        var a = document.createElement('a');
+        a.href = link;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function() {
+          if (!document.hidden) {
+            navigator.clipboard.writeText('${rawPath.replace(/\\/g, '\\\\')}').then(function() {
+              document.getElementById('copiedMsg').style.display = 'inline';
+              setTimeout(function() { document.getElementById('copiedMsg').style.display = 'none'; }, 2000);
+            });
+          }
+        }, 300);
+      } catch (e) {
+        navigator.clipboard.writeText('${rawPath.replace(/\\/g, '\\\\')}').then(function() {
+          document.getElementById('copiedMsg').style.display = 'inline';
+          setTimeout(function() { document.getElementById('copiedMsg').style.display = 'none'; }, 2000);
+        });
+      }
     });
   </script>
 </body>
