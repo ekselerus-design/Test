@@ -85,6 +85,7 @@ app.all('*', async (req, res, next) => {
 // Новая страница для открытия протокола (без iframe)
 app.get('/open', (req, res) => {
   const rawPath = req.query.path || '';
+  // rawPath приходит в формате UNC (\\PROMSRV\...). Делаем сетевой путь для протокола.
   const cleanPath = rawPath.replace(/\\/g, '/').replace(/^\/+/, '');
   const link = `networkfolder://${cleanPath}`;
 
@@ -96,17 +97,26 @@ app.get('/open', (req, res) => {
   <style>
     body { font-family: "Segoe UI", sans-serif; padding: 30px; background: #f9f9f9; text-align: center; }
     .message { margin-top: 40px; color: #555; }
+    .link-text { font-size: 14px; color: #888; margin-top: 15px; word-break: break-all; }
   </style>
 </head>
 <body>
   <h2>📂 Открываем папку...</h2>
   <p class="message">Если папка не открылась автоматически, скопируйте путь:</p>
   <p><strong id="path">${rawPath}</strong></p>
+  <div class="link-text">Ссылка протокола: <span id="link">${link}</span></div>
   <script>
     (function() {
-      // Пытаемся перейти на протокол (сейчас это верхнеуровневое окно, блокировки нет)
-      window.location.href = '${link}';
-      // Если через 500 мс страница всё ещё здесь, показываем сообщение и копируем путь
+      var link = '${link}';
+      // Создаём элемент <a> и кликаем по нему – это надёжно запускает кастомный протокол
+      var a = document.createElement('a');
+      a.href = link;
+      a.target = '_self';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // Если через 500 мс страница всё ещё видна, копируем путь
       setTimeout(function() {
         if (document.hidden) return;
         navigator.clipboard.writeText('${rawPath.replace(/\\/g, '\\\\')}').then(function() {
@@ -118,6 +128,7 @@ app.get('/open', (req, res) => {
 </body>
 </html>`);
 });
+
 
 function successPage(rawPath, cleanPath) {
   return `<!DOCTYPE html>
