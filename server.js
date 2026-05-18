@@ -14,7 +14,11 @@ function fetchUrl(url) {
   });
 }
 
-app.all('*', async (req, res) => {
+// Основной обработчик для встройки в задачу (как раньше)
+app.all('*', async (req, res, next) => {
+  // Если запрос к /open, пропускаем дальше
+  if (req.path === '/open') return next();
+
   try {
     const authId = req.body.AUTH_ID;
     const placementOptionsRaw = req.body.PLACEMENT_OPTIONS;
@@ -67,18 +71,55 @@ app.all('*', async (req, res) => {
       return res.send(errorPage('Не удалось извлечь путь к папке.'));
     }
 
-    // Преобразуем в формат networkfolder:// (меняем \\ на /, убираем ведущие слеши)
     const cleanPath = rawPath.replace(/\\/g, '/').replace(/^\/+/, '');
     const link = `networkfolder://${cleanPath}`;
 
-    res.send(successPage(rawPath, link));
+    // Передаём путь в кнопку (теперь она открывает /open)
+    res.send(successPage(rawPath, cleanPath));
 
   } catch (e) {
     res.send(errorPage('Ошибка сервера: ' + e.message));
   }
 });
 
-function successPage(rawPath, link) {
+// Новая страница для открытия протокола (без iframe)
+app.get('/open', (req, res) => {
+  const rawPath = req.query.path || '';
+  const cleanPath = rawPath.replace(/\\/g, '/').replace(/^\/+/, '');
+  const link = `networkfolder://${cleanPath}`;
+
+  res.send(`<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Открытие папки...</title>
+  <style>
+    body { font-family: "Segoe UI", sans-serif; padding: 30px; background: #f9f9f9; text-align: center; }
+    .message { margin-top: 40px; color: #555; }
+  </style>
+</head>
+<body>
+  <h2>📂 Открываем папку...</h2>
+  <p class="message">Если папка не открылась автоматически, скопируйте путь:</p>
+  <p><strong id="path">${rawPath}</strong></p>
+  <script>
+    (function() {
+      // Пытаемся перейти на протокол (сейчас это верхнеуровневое окно, блокировки нет)
+      window.location.href = '${link}';
+      // Если через 500 мс страница всё ещё здесь, показываем сообщение и копируем путь
+      setTimeout(function() {
+        if (document.hidden) return;
+        navigator.clipboard.writeText('${rawPath.replace(/\\/g, '\\\\')}').then(function() {
+          document.body.innerHTML += '<p style="color: #2fc6f6;">✔ Путь скопирован в буфер обмена. Вставьте его в адресную строку Проводника.</p>';
+        });
+      }, 500);
+    })();
+  </script>
+</body>
+</html>`);
+});
+
+function successPage(rawPath, cleanPath) {
   return `<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -89,43 +130,17 @@ function successPage(rawPath, link) {
     .btn { display: inline-block; padding: 14px 28px; margin: 20px 0; background-color: #2fc6f6; color: white !important; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.15); transition: background-color 0.2s; cursor: pointer; border: none; }
     .btn:hover { background-color: #1b6d8c; }
     .path { margin-top: 15px; font-size: 14px; color: #555; word-break: break-all; }
-    .copied { color: #2fc6f6; display: none; margin-left: 10px; }
   </style>
 </head>
 <body>
   <h2>📂 Документы по задаче</h2>
   <p>Сетевой путь:<br><strong>${rawPath}</strong></p>
-  <button class="btn" id="openBtn">📂 Открыть папку в проводнике</button>
-  <span id="copiedMsg" class="copied">✔ Скопировано</span>
   <p style="margin-top: 25px; color: #888; font-size: 13px;">
-    Если кнопка не сработала, путь уже скопирован – вставьте его в адресную строку Проводника (Win+E).
+    Нажмите кнопку – откроется проводник.
   </p>
-  <script>
-    document.getElementById('openBtn').addEventListener('click', function() {
-      var link = '${link}';
-      try {
-        var a = document.createElement('a');
-        a.href = link;
-        a.target = '_blank';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(function() {
-          if (!document.hidden) {
-            navigator.clipboard.writeText('${rawPath.replace(/\\/g, '\\\\')}').then(function() {
-              document.getElementById('copiedMsg').style.display = 'inline';
-              setTimeout(function() { document.getElementById('copiedMsg').style.display = 'none'; }, 2000);
-            });
-          }
-        }, 300);
-      } catch (e) {
-        navigator.clipboard.writeText('${rawPath.replace(/\\/g, '\\\\')}').then(function() {
-          document.getElementById('copiedMsg').style.display = 'inline';
-          setTimeout(function() { document.getElementById('copiedMsg').style.display = 'none'; }, 2000);
-        });
-      }
-    });
-  </script>
+  <button class="btn" onclick="window.open('/open?path=${encodeURIComponent(cleanPath)}', '_blank')">
+    📂 Открыть папку в проводнике
+  </button>
 </body>
 </html>`;
 }
