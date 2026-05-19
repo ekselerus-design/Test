@@ -14,9 +14,8 @@ function fetchUrl(url) {
   });
 }
 
-// Основной обработчик для встройки в задачу (как раньше)
+// Основной обработчик для встройки в задачу
 app.all('*', async (req, res, next) => {
-  // Если запрос к /open, пропускаем дальше
   if (req.path === '/open') return next();
 
   try {
@@ -71,10 +70,9 @@ app.all('*', async (req, res, next) => {
       return res.send(errorPage('Не удалось извлечь путь к папке.'));
     }
 
+    // Преобразуем UNC-путь (\\PROMSRV\...) в формат для протокола (PROMSRV/...)
     const cleanPath = rawPath.replace(/\\/g, '/').replace(/^\/+/, '');
-    const link = `networkfolder://${cleanPath}`;
 
-    // Передаём путь в кнопку (теперь она открывает /open)
     res.send(successPage(rawPath, cleanPath));
 
   } catch (e) {
@@ -84,10 +82,11 @@ app.all('*', async (req, res, next) => {
 
 // Новая страница для открытия протокола (без iframe)
 app.get('/open', (req, res) => {
-  const rawPath = req.query.path || '';
-  // rawPath приходит в формате UNC (\\PROMSRV\...). Делаем сетевой путь для протокола.
-  const cleanPath = rawPath.replace(/\\/g, '/').replace(/^\/+/, '');
-  const link = `networkfolder://${cleanPath}`;
+  const encodedPath = req.query.path || '';
+  // Декодируем для отображения пользователю
+  const rawPath = decodeURIComponent(encodedPath);
+  // Строим ссылку с ЗАКОДИРОВАННЫМ путём (без пробелов и кириллицы)
+  const link = `networkfolder://${encodedPath}`;
 
   res.send(`<!DOCTYPE html>
 <html lang="ru">
@@ -97,14 +96,12 @@ app.get('/open', (req, res) => {
   <style>
     body { font-family: "Segoe UI", sans-serif; padding: 30px; background: #f9f9f9; text-align: center; }
     .message { margin-top: 40px; color: #555; }
-    .link-text { font-size: 14px; color: #888; margin-top: 15px; word-break: break-all; }
   </style>
 </head>
 <body>
   <h2>📂 Открываем папку...</h2>
   <p class="message">Если папка не открылась автоматически, скопируйте путь:</p>
-  <p><strong id="path">${rawPath}</strong></p>
-  <div class="link-text">Ссылка протокола: <span id="link">${link}</span></div>
+  <p><strong>${rawPath}</strong></p>
   <script>
     (function() {
       var link = '${link}';
@@ -129,8 +126,9 @@ app.get('/open', (req, res) => {
 </html>`);
 });
 
-
 function successPage(rawPath, cleanPath) {
+  // Кодируем путь для безопасной передачи в URL (без пробелов и кириллицы)
+  const encodedPath = encodeURIComponent(cleanPath);
   return `<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -146,12 +144,12 @@ function successPage(rawPath, cleanPath) {
 <body>
   <h2>📂 Документы по задаче</h2>
   <p>Сетевой путь:<br><strong>${rawPath}</strong></p>
+  <button class="btn" onclick="window.open('/open?path=${encodedPath}', '_blank')">
+    📂 Открыть папку в проводнике
+  </button>
   <p style="margin-top: 25px; color: #888; font-size: 13px;">
     Нажмите кнопку – откроется проводник.
   </p>
-  <button class="btn" onclick="window.open('/open?path=${encodeURIComponent(cleanPath)}', '_blank')">
-    📂 Открыть папку в проводнике
-  </button>
 </body>
 </html>`;
 }
